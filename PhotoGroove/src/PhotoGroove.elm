@@ -1,19 +1,135 @@
 module PhotoGroove exposing (..)
 
-import Html exposing (div, h1, img, text)
+import Array exposing (Array)
+import Browser
+import Html exposing (..)
 import Html.Attributes exposing (..)
+import Html.Events exposing (onClick)
+import Random
 
 
+type alias Photo =
+    { url : String
+    }
+
+
+photoArray : Array Photo
+photoArray =
+    Array.fromList initialModel.photos
+
+
+type ThumbnailSize
+    = Small
+    | Medium
+    | Large
+
+
+type alias Model =
+    { photos : List Photo
+    , selectedPhoto : String
+    , chosenSize : ThumbnailSize
+    }
+
+
+initialModel : Model
+initialModel =
+    { photos =
+        [ { url = "1.jpeg" }
+        , { url = "2.jpeg" }
+        , { url = "3.jpeg" }
+        ]
+    , selectedPhoto = "1.jpeg"
+    , chosenSize = Small
+    }
+
+
+type Msg
+    = ClickedPhoto String
+    | ClickedSurpriseMe
+    | ClickedSize ThumbnailSize
+    | GotSelectedIndex Int
+
+
+urlPrefix : String
+urlPrefix =
+    "http://elm-in-action.com/"
+
+
+view : Model -> Html Msg
 view model =
     div [ class "photo-groove" ]
         [ h1 [] [ text "Photo Groove" ]
-        , div [ id "thumbnails" ]
-            [ img [ src "http://elm-in-action.com/1.jpeg" ] []
-            , img [ src "http://elm-in-action.com/2.jpeg" ] []
-            , img [ src "http://elm-in-action.com/3.jpeg" ] []
-            ]
+        , button [ onClick ClickedSurpriseMe ] [ text "Surprise Me!" ]
+        , h3 [] [ text "Thumbnail Size" ]
+        , div [ id "choose-size" ]
+            (List.map viewSizeChooser [ Small, Medium, Large ])
+        , div [ id "thumbnails", class (sizeToString model.chosenSize) ] (List.map (viewThumbnail model.selectedPhoto) model.photos)
+        , img [ class "large", src (urlPrefix ++ "large/" ++ model.selectedPhoto) ] []
         ]
 
 
+viewSizeChooser : ThumbnailSize -> Html Msg
+viewSizeChooser size =
+    label [ class "size-chooser" ]
+        [ input [ type_ "radio", name "size", value "small", onClick (ClickedSize size) ] []
+        , text (sizeToString size)
+        ]
+
+
+sizeToString : ThumbnailSize -> String
+sizeToString size =
+    case size of
+        Small ->
+            "small"
+
+        Medium ->
+            "medium"
+
+        Large ->
+            "large"
+
+
+viewThumbnail : String -> Photo -> Html Msg
+viewThumbnail selectedUrl thumb =
+    img [ src (urlPrefix ++ thumb.url), classList [ ( "selected", selectedUrl == thumb.url ) ], onClick (ClickedPhoto thumb.url) ] []
+
+
+getPhotoUrl : Int -> String
+getPhotoUrl index =
+    case Array.get index photoArray of
+        Just photo ->
+            photo.url
+
+        Nothing ->
+            ""
+
+
+randomPhotoPicker : Random.Generator Int
+randomPhotoPicker =
+    Random.int 0 (Array.length photoArray - 1)
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        ClickedPhoto url ->
+            ( { model | selectedPhoto = url }, Cmd.none )
+
+        ClickedSurpriseMe ->
+            ( model, Random.generate GotSelectedIndex randomPhotoPicker )
+
+        ClickedSize size ->
+            ( { model | chosenSize = size }, Cmd.none )
+
+        GotSelectedIndex index ->
+            ( { model | selectedPhoto = getPhotoUrl index }, Cmd.none )
+
+
+main : Program () Model Msg
 main =
-    view "no model yet"
+    Browser.element
+        { init = \flags -> ( initialModel, Cmd.none )
+        , view = view
+        , update = update
+        , subscriptions = \model -> Sub.none
+        }
